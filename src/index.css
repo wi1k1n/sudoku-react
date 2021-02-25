@@ -45,6 +45,12 @@ ol, ul {
 .square-focus {
     border: 2px solid rgb(0, 201, 60);
 }
+.square-focus-frozen {
+    border: 2px solid rgb(83, 83, 83);
+}
+.square-frozen {
+    color: rgb(3, 99, 0);
+}
 
 .square:focus {
     outline: none;

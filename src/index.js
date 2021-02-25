@@ -5,6 +5,10 @@ import KeyHandler, { KEYPRESS, KEYDOWN } from 'react-key-handler';
 import Select from '@material-ui/core/Select';
 import MenuItem from '@material-ui/core/MenuItem';
 import Button from '@material-ui/core/Button';
+import Dialog from '@material-ui/core/Dialog';
+import DialogContent from '@material-ui/core/DialogContent';
+import DialogContentText from '@material-ui/core/DialogContentText';
+import DialogActions from '@material-ui/core/DialogActions';
 
 import './index.css';
 
@@ -17,7 +21,15 @@ class Square extends React.Component {
     render() {
         const bCN = this.props.bordersClassName;
         const cnt_clName = 'square-container' + (bCN ? (' ' + bCN) : '');
-        const sq_clName = 'square' + (this.props.focused ? ' square-focus' : '');
+        let sq_clName = 'square';
+        if (this.props.frozen)
+            sq_clName += ' square-frozen';
+        if (this.props.focused) {
+            if (this.props.frozen)
+                sq_clName += ' square-focus-frozen';
+            else
+                sq_clName += ' square-focus';
+        }
         return (
             <div
                 className={cnt_clName}
@@ -40,8 +52,11 @@ class Board extends React.Component {
             squares: Array(81).fill(null),
             answer: null,
             difficulty: 45,
+            frozenSquares: [],
 
             focused: null,
+
+            congratsOpen: false,
         };
 
         this.indices = this.precomputeIndices();
@@ -89,16 +104,22 @@ class Board extends React.Component {
     }
     onDigitKey(evt) {
         if (!this.state.focused) return;
-        
-        const f = this.state.focused;
-        const sq = this.state.squares.slice();
 
+        const f = this.state.focused;
+
+        if (this.state.frozenSquares.includes(f[0] * 9 + f[1])) return;
+
+        const sq = this.state.squares.slice();
         if (evt.key == 'Delete') {
-            sq[f[0] * 9 + f[1]] = '';
+            sq[f[0] * 9 + f[1]] = null;
         } else {
             sq[f[0] * 9 + f[1]] = parseInt(evt.key[0]) - 1;
         }
         this.setState({squares: sq});
+
+        if (this.isWin()) {
+            this.setState({congratsOpen: true});
+        }
     }
 
     precomputeIndices() {
@@ -152,7 +173,11 @@ class Board extends React.Component {
             this.setState({squares: newArr});
         } while (changed && indices.length > this.state.difficulty);
         
-        this.setState({squares: newArr, answer: answer});
+        this.setState({
+            squares: newArr,
+            answer: answer,
+            frozenSquares: newArr.map((v, i) => v !== null ? i : null).filter(v => v !== null),
+        });
     }
     fillSudoku(arr) {
         // find next empty cell
@@ -199,6 +224,10 @@ class Board extends React.Component {
             this.solveSudoku(arr);
             arr[idx] = null;
         }
+    }
+    isWin() {
+        if (this.state.answer === null) return;
+        return this.state.squares.every((v, i) => this.state.answer[i] === v);
     }
     logSudoku(arr) {
         const zeroPad = (num, places) => String(num).padStart(places, ' ')
@@ -250,6 +279,7 @@ class Board extends React.Component {
                 value={v}
                 bordersClassName={bCN}
                 focused={focused}
+                frozen={this.state.frozenSquares.includes(r * 9 + c)}
                 key={'s'+(r*9+c)}
                 onClick={() => this.handleClick(r, c)}
             />
@@ -304,7 +334,23 @@ class Board extends React.Component {
                         {this.difficulties}
                     </Select>
                 </div>
+
                 {rows}
+
+                <Dialog
+                    open={this.state.congratsOpen}
+                >
+                    <DialogContent>
+                        <DialogContentText>
+                            Congratulations!
+                        </DialogContentText>
+                    </DialogContent>
+                    <DialogActions>
+                        <Button onClick={() => { this.setState({congratsOpen: false}); }} color="primary">
+                            OK
+                        </Button>
+                    </DialogActions>
+                </Dialog>
             </div>
         );
     }
