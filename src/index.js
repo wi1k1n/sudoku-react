@@ -1,6 +1,10 @@
 import React from 'react';
 import ReactDOM from 'react-dom';
 import KeyHandler, { KEYPRESS, KEYDOWN } from 'react-key-handler';
+// import Select from 'react-select'
+import Select from '@material-ui/core/Select';
+import MenuItem from '@material-ui/core/MenuItem';
+import Button from '@material-ui/core/Button';
 
 import './index.css';
 
@@ -33,20 +37,32 @@ class Board extends React.Component {
     constructor(props) {
         super(props);
         this.state = {
-            // squares: Array.from(Array(81).keys()).sort((a, b) => Math.random() - 0.5)
             squares: Array(81).fill(null),
+            answer: null,
+            difficulty: 45,
+
             focused: null,
         };
 
-        this.indices = this.computeIndices();
+        this.indices = this.precomputeIndices();
+        this.solutions = 0;
+        this.difficulties = [
+            (<MenuItem value="45" key="menuitem1">Easy</MenuItem>),
+            (<MenuItem value="35" key="menuitem2">Medium</MenuItem>),
+            (<MenuItem value="25" key="menuitem3">Hard</MenuItem>),
+        ];
 
         this.randomize = this.randomize.bind(this);
         this.onArrowKey = this.onArrowKey.bind(this);
         this.onDigitKey = this.onDigitKey.bind(this);
+        this.difficultyChange = this.difficultyChange.bind(this);
     }
 
     handleClick(r, c) {
         this.setState({focused: [r, c]});
+    }
+    difficultyChange(evt) {
+        this.setState({difficulty: evt.target.value});
     }
     
     onArrowKey(evt) {
@@ -80,12 +96,12 @@ class Board extends React.Component {
         if (evt.key == 'Delete') {
             sq[f[0] * 9 + f[1]] = '';
         } else {
-            sq[f[0] * 9 + f[1]] = parseInt(evt.key[0]);
+            sq[f[0] * 9 + f[1]] = parseInt(evt.key[0]) - 1;
         }
         this.setState({squares: sq});
     }
 
-    computeIndices() {
+    precomputeIndices() {
         let rows = [];
         let cols = [];
         let blocks = [];
@@ -112,26 +128,31 @@ class Board extends React.Component {
         };
     }
     randomize(evt) {
-        let rndArr = Array.from(Array(81).keys()).sort((a, b) => Math.random() - 0.5);
-        // this.setState({squares: rndArr});
         let newArr = Array(81).fill(null);
-        // for (let i = 0; i < rndArr.length; i++) {
-        //     let r = Math.floor(i / 9);
-        //     let c = i % 9;
-        //     let sr = Math.floor(r / 3);
-        //     let sc = (Math.floor(c / 3) % 3);
-        //     let rndArrSm = Array.from(Array(9).keys()).sort((a, b) => Math.random() - 0.5);
-        //     for (let j = 0; j < rndArrSm.length; j++) {
-        //         let v = rndArrSm[j];
-        //         if (!this.isInRow(r, v, newArr) && !this.isInCol(c, v, newArr) && !this.isInBlock(sr, sc, v, newArr)) {
-        //             newArr[i] = v;
-        //             break;
-        //         }
-        //     }
-        //     // this.logSudoku(newArr);
-        // }
         this.fillSudoku(newArr);
-        this.setState({squares: newArr});
+        const answer = newArr.slice();
+
+        let indices = Array.from(Array(81).keys()).sort((a, b) => Math.random() - 0.5);
+        let changed = false;
+        do {
+            changed = false;
+            for (let i = 0; i < indices.length; i++) {
+                const idx = indices[i];
+                newArr[idx] = null;
+                this.solutions = 0;
+                this.solveSudoku(newArr);
+                if (this.solutions == 1) {
+                    changed = true;
+                    indices.splice(i, 1);
+                    break;
+                }
+                newArr[idx] = answer[idx];
+                continue;
+            }
+            this.setState({squares: newArr});
+        } while (changed && indices.length > this.state.difficulty);
+        
+        this.setState({squares: newArr, answer: answer});
     }
     fillSudoku(arr) {
         // find next empty cell
@@ -157,6 +178,27 @@ class Board extends React.Component {
             arr[idx] = null;
         }
         return false;
+    }
+    solveSudoku(arr) {
+        let idx = arr.findIndex(v => v === null);
+        if (idx === -1) {
+            this.solutions += 1;
+            // this.logSudoku(arr);
+            return true;
+        }
+
+        let numbers = Array.from(Array(9).keys());
+        for (let j = 0; j < numbers.length; j++) {
+            const v = numbers[j];
+            // skip invalid numbers
+            if (!this.isValid(idx, v, arr)) continue;
+            
+            // try first valid number
+            arr[idx] = v;
+            // go down into recursion
+            this.solveSudoku(arr);
+            arr[idx] = null;
+        }
     }
     logSudoku(arr) {
         const zeroPad = (num, places) => String(num).padStart(places, ' ')
@@ -199,11 +241,13 @@ class Board extends React.Component {
             bCN += ' square-border-' + l;
         }
         const focused = (this.state.focused && this.state.focused[0] == r && this.state.focused[1] == c ? 1 : 0);
+        let v = this.state.squares[r * 9 + c];
+        v = v == null ? null : v + 1;
         return (
             <Square
                 row={r}
                 col={c}
-                value={this.state.squares[r * 9 + c]}
+                value={v}
                 bordersClassName={bCN}
                 focused={focused}
                 key={'s'+(r*9+c)}
@@ -248,12 +292,17 @@ class Board extends React.Component {
                     onKeyHandle={this.onDigitKey}
                 />
                 <div className="status">
-                    <button
-                        className="control-btn"
+                    <Button
                         onClick={this.randomize}
                     >
                         Randomize
-                    </button>
+                    </Button>
+                    <Select
+                        onChange={this.difficultyChange}
+                        defaultValue={this.difficulties[0].props.value}
+                    >
+                        {this.difficulties}
+                    </Select>
                 </div>
                 {rows}
             </div>
