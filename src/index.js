@@ -38,6 +38,8 @@ class Board extends React.Component {
             focused: null,
         };
 
+        this.indices = this.computeIndices();
+
         this.randomize = this.randomize.bind(this);
         this.onArrowKey = this.onArrowKey.bind(this);
         this.onDigitKey = this.onDigitKey.bind(this);
@@ -83,8 +85,112 @@ class Board extends React.Component {
         this.setState({squares: sq});
     }
 
+    computeIndices() {
+        let rows = [];
+        let cols = [];
+        let blocks = [];
+        for (let i = 0; i < 9; i++) {
+            // rows
+            rows.push(Array.from(Array(9).keys()).map(v => v + i * 9));
+            // cols
+            cols.push(Array.from(Array(9).keys()).map(v => v * 9 + i));
+            // blocks
+            let block = [];
+            for (let j = 0; j < 3; j++) {
+                // let tr = Math.floor(i / 3) * 3;
+                // let tc = (i % 3) * 3;
+                // let start = (tr + j) * 9 + tc;
+                let start = (Math.floor(i / 3) * 3 + j) * 9 + (i % 3) * 3;
+                block = block.concat(Array.from(Array(3).keys()).map(v => start + v));
+            }
+            blocks.push(block);
+        }
+        return {
+            rows: rows,
+            cols: cols,
+            blocks: blocks,
+        };
+    }
     randomize(evt) {
-        this.setState({squares: Array.from(Array(81).keys()).sort((a, b) => Math.random() - 0.5)});
+        let rndArr = Array.from(Array(81).keys()).sort((a, b) => Math.random() - 0.5);
+        // this.setState({squares: rndArr});
+        let newArr = Array(81).fill(null);
+        // for (let i = 0; i < rndArr.length; i++) {
+        //     let r = Math.floor(i / 9);
+        //     let c = i % 9;
+        //     let sr = Math.floor(r / 3);
+        //     let sc = (Math.floor(c / 3) % 3);
+        //     let rndArrSm = Array.from(Array(9).keys()).sort((a, b) => Math.random() - 0.5);
+        //     for (let j = 0; j < rndArrSm.length; j++) {
+        //         let v = rndArrSm[j];
+        //         if (!this.isInRow(r, v, newArr) && !this.isInCol(c, v, newArr) && !this.isInBlock(sr, sc, v, newArr)) {
+        //             newArr[i] = v;
+        //             break;
+        //         }
+        //     }
+        //     // this.logSudoku(newArr);
+        // }
+        this.fillSudoku(newArr);
+        this.setState({squares: newArr});
+    }
+    fillSudoku(arr) {
+        // find next empty cell
+        let idx = arr.findIndex(v => v === null);
+        // no empty cells found => sudoku filled
+        if (idx === -1) return true;
+        
+        // trying to fill with one of 0..8
+        let numbers = Array.from(Array(9).keys()).sort((a, b) => Math.random() - 0.5);
+        for (let j = 0; j < numbers.length; j++) {
+            const v = numbers[j];
+            // skip invalid numbers
+            if (!this.isValid(idx, v, arr)) continue;
+            
+            // try first valid number
+            arr[idx] = v;
+            // go down into recursion
+            if (this.fillSudoku(arr)) {
+                // if success, return success back through recursion
+                return true;
+            }
+            // if failed, return current value back to null
+            arr[idx] = null;
+        }
+        return false;
+    }
+    logSudoku(arr) {
+        const zeroPad = (num, places) => String(num).padStart(places, ' ')
+        let s = '';
+        for (let i = 0; i < 9; i++) {
+            for (let j = 0; j < 9; j++) {
+                s += zeroPad(arr[i * 9 + j], 5);
+            }
+            s += '\n';
+        }
+        console.log(s);
+    }
+
+    isValid(idx, v, ar) {
+        let arr = ar ? ar : this.state.squares;
+        // row, col, blockrow, blockcol
+        let r = Math.floor(idx / 9);
+        let c = idx % 9;
+        // let br = Math.floor(r / 3);
+        // let bc = (Math.floor(c / 3) % 3);
+        // return !(this.isInRow(r, v, arr) || this.isInCol(c, v, arr) || this.isInBlock(br, bc, v, arr));
+        return !(this.isInRow(r, v, arr) || this.isInCol(c, v, arr) || this.isInBlock(Math.floor(r / 3), (Math.floor(c / 3) % 3), v, arr));
+    }
+    isInRow(r, v, ar) {
+        let arr = ar ? ar : this.state.squares;
+        return this.indices.rows[r].map(ind => arr[ind]).includes(v);
+    }
+    isInCol(c, v, ar) {
+        let arr = ar ? ar : this.state.squares;
+        return this.indices.cols[c].map(ind => arr[ind]).includes(v);
+    }
+    isInBlock(sr, sc, v, ar) {
+        let arr = ar ? ar : this.state.squares;
+        return this.indices.blocks[sr * 3 + sc].map(ind => arr[ind]).includes(v);
     }
 
     renderSquare(r, c, b) {

@@ -43,7 +43,7 @@ ol, ul {
     width: 48px;
 }
 .square-focus {
-    border: 1px solid rgb(0, 201, 60);
+    border: 2px solid rgb(0, 201, 60);
 }
 
 .square:focus {
